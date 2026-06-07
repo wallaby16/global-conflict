@@ -26,35 +26,26 @@ import {
   Zap,
   Activity,
   ChevronRight,
-  Crosshair
+  Crosshair,
+  Clock,
+  MessageSquareWarning
 } from 'lucide-react';
 
-// Khai báo an toàn chống lỗi crash trên GitHub Pages khi không có Firebase thật
-let app, auth, db;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'global-conflict-tracker-prod';
-const apiKey = "AIzaSyAoTE62_pJFLSZERX8rZG3-Qqvn4Lc7OyI"; // API Key Gemini của bạn
-
-// Cấu hình Firebase mặc định (Bạn có thể thay thế bằng config thật từ Firebase Console của bạn)
-const fallbackFirebaseConfig = {
-  apiKey: "AIzaSyFakeKeyForGitHubPagesDemoOnly",
-  authDomain: "global-conflict-tracker.firebaseapp.com",
-  projectId: "global-conflict-tracker",
-  storageBucket: "global-conflict-tracker.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef"
+const firebaseConfig = {
+  apiKey: "AIzaSyAoTE62_pJFLSZERX8rZG3-Qqvn4Lc7OyI",
+  authDomain: "world-conflict-mon.firebaseapp.com",
+  projectId: "world-conflict-mon",
+  storageBucket: "world-conflict-mon.firebasestorage.app",
+  messagingSenderId: "154826481677",
+  appId: "1:154826481677:web:e24aaed64070e21fe8b544",
+  measurementId: "G-JJMCFHDY54"
 };
 
-try {
-  const config = typeof __firebase_config !== 'undefined' 
-    ? JSON.parse(__firebase_config) 
-    : fallbackFirebaseConfig;
-  
-  app = initializeApp(config);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (e) {
-  console.error("Firebase không thể khởi tạo:", e);
-}
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = 'global-conflict-tracker-prod'; // Khai báo một chuỗi ID cố định cho dự án của bạn
+const apiKey = "AIzaSyAoTE62_pJFLSZERX8rZG3-Qqvn4Lc7OyI"; // Giữ nguyên API Key Gemini này
 
 const VIETNAM_EMBASSY_CONTACTS = {
   "Ukraine": { phone: "+380 93 468 1168", address: "51 Pouchkinska, Kiev" },
@@ -68,34 +59,46 @@ const VIETNAM_EMBASSY_CONTACTS = {
 
 const DEFAULT_ZONES = [
   {
-    id: 'ukraine-conflict',
+    id: 'ukraine-conflict-1',
     country_vn: 'Ukraine',
     country: 'Ukraine',
     lat: 48.37,
     lng: 31.16,
     severity: 'high',
-    detail: 'Giao tranh tiếp diễn dữ dội tại các mặt trận phía Đông. Tình hình nhân đạo báo động.',
-    advisory: 'Khuyến cáo: Tuyệt đối không di chuyển đến các khu vực chiến sự.'
+    detail: 'Giao tranh tiếp diễn dữ dội tại các mặt trận phía Đông. Tình hình nhân đạo ở khu vực tiền tuyến đang ở mức báo động cao.',
+    advisory: 'Khuyến cáo: Tuyệt đối không di chuyển đến các khu vực chiến sự phía Đông và Nam.'
   },
   {
-    id: 'israel-gaza',
+    id: 'ukraine-conflict-2',
+    country_vn: 'Ukraine',
+    country: 'Ukraine',
+    lat: 48.37,
+    lng: 31.16,
+    severity: 'medium',
+    detail: 'Hệ thống hạ tầng năng lượng tại Thủ đô Kiev gặp sự cố diện rộng do oanh kích. Điện và nước sạch luân phiên bị cắt giảm.',
+    advisory: 'Khuyến cáo: Công dân tại Kiev cần dự trữ đủ lương thực, nước uống và thiết bị sạc dự phòng.'
+  },
+  {
+    id: 'israel-gaza-1',
     country_vn: 'Israel',
     country: 'Israel',
     lat: 31.04,
     lng: 34.85,
     severity: 'high',
-    detail: 'Căng thẳng leo thang tại khu vực biên giới. Các biện pháp an ninh được thắt chặt tối đa.',
-    advisory: 'Công dân cần đăng ký bảo hộ và theo dõi sát thông tin từ ĐSQ.'
+    detail: 'Căng thẳng leo thang nghiêm trọng tại khu vực biên giới phía Nam. Hệ thống phòng không hoạt động liên tục.',
+    advisory: 'Khuyến cáo: Hạn chế di chuyển đến khu vực giáp ranh Gaza.'
+  },
+  {
+    id: 'israel-gaza-2',
+    country_vn: 'Israel',
+    country: 'Israel',
+    lat: 31.04,
+    lng: 34.85,
+    severity: 'medium',
+    detail: 'Các cuộc biểu tình quy mô lớn diễn ra tại Tel Aviv gây gián đoạn giao thông và thắt chặt an ninh đô thị.',
+    advisory: 'Khuyến cáo: Tránh xa các tụ điểm tập trung đông người và tuân thủ tuyệt đối cảnh báo địa phương.'
   }
 ];
-
-const getSeverityColor = (severity) => {
-  switch (severity?.toLowerCase()) {
-    case 'high': return '#ef4444'; 
-    case 'medium': return '#f97316'; 
-    default: return '#eab308'; 
-  }
-};
 
 const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
   const mountRef = useRef(null);
@@ -106,6 +109,7 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
 
   useEffect(() => { zonesRef.current = zones; }, [zones]);
 
+  // Camera animation movement to selected grouped zone
   useEffect(() => {
     if (selectedZone && cameraRef.current && controlsRef.current) {
       const lat = parseFloat(selectedZone.lat);
@@ -113,7 +117,7 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
       const phi = (90 - lat) * (Math.PI / 180);
       const theta = (lng + 180) * (Math.PI / 180);
       
-      const r = 280; 
+      const r = 260; 
       const targetX = -(r * Math.sin(phi) * Math.cos(theta));
       const targetY = r * Math.cos(phi);
       const targetZ = r * Math.sin(phi) * Math.sin(theta);
@@ -141,18 +145,23 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
       
       const isSelected = selectedZone?.id === z.id;
       
+      // Pin base visual based on consolidated threat severity
+      const pinColor = isSelected ? 0x60a5fa : (z.severity === 'high' ? 0xef4444 : 0xf97316);
+      
+      // Draw single composite pin for the location group
       const pin = new THREE.Mesh(
-        new THREE.SphereGeometry(isSelected ? 3.8 : 2.5, 16, 16), 
-        new THREE.MeshBasicMaterial({ color: isSelected ? 0x60a5fa : (z.severity === 'high' ? 0xef4444 : 0xf97316) })
+        new THREE.SphereGeometry(isSelected ? 4.2 : 3.0, 16, 16), 
+        new THREE.MeshBasicMaterial({ color: pinColor })
       );
       pin.position.set(x, y, zPos);
       pin.userData = { id: z.id };
       markers.add(pin);
 
+      // Pulse ring animation
       const ring = new THREE.Mesh(
-        new THREE.RingGeometry(isSelected ? 4.5 : 3.5, isSelected ? 6.5 : 5.5, 32), 
+        new THREE.RingGeometry(isSelected ? 5.0 : 4.0, isSelected ? 7.5 : 6.0, 32), 
         new THREE.MeshBasicMaterial({ 
-          color: isSelected ? 0x3b82f6 : (z.severity === 'high' ? 0xef4444 : 0xf97316), 
+          color: pinColor, 
           transparent: true, 
           side: THREE.DoubleSide, 
           opacity: 0.8 
@@ -169,7 +178,7 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
     if (!mountRef.current) return;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, mountRef.current.clientWidth / mountRef.current.clientHeight, 0.1, 1500);
-    camera.position.z = 350;
+    camera.position.z = 320;
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -183,6 +192,7 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
     controls.autoRotateSpeed = 0.4;
     controlsRef.current = controls;
 
+    // Vector border styled high-visibility map
     const geometry = new THREE.SphereGeometry(100, 64, 64);
     const textureLoader = new THREE.TextureLoader();
     
@@ -205,6 +215,7 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
     const earth = new THREE.Mesh(geometry, earthMaterial);
     scene.add(earth);
 
+    // Matrix grid system overlay
     const gridGeo = new THREE.SphereGeometry(101, 32, 32);
     const gridMat = new THREE.MeshBasicMaterial({ 
       color: 0x3b82f6, 
@@ -214,11 +225,12 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
     });
     scene.add(new THREE.Mesh(gridGeo, gridMat));
 
-    const glowGeo = new THREE.SphereGeometry(115, 64, 64);
+    // Atmosphere glowing ring
+    const glowGeo = new THREE.SphereGeometry(114, 64, 64);
     const glowMat = new THREE.ShaderMaterial({
       uniforms: {
-        'c': { type: 'f', value: 0.2 },
-        'p': { type: 'f', value: 4.0 },
+        'c': { type: 'f', value: 0.25 },
+        'p': { type: 'f', value: 4.5 },
         glowColor: { type: 'c', value: new THREE.Color(0x3b82f6) },
         viewVector: { type: 'v3', value: camera.position }
       },
@@ -246,7 +258,7 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
     scene.add(new THREE.Mesh(glowGeo, glowMat));
 
     scene.add(markersGroupRef.current);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75));
     const mainLight = new THREE.DirectionalLight(0xffffff, 1);
     mainLight.position.set(5, 3, 5);
     scene.add(mainLight);
@@ -281,7 +293,6 @@ const ThreeGlobe = ({ zones, onSelect, selectedZone }) => {
     animate();
 
     const handleResize = () => {
-      if (!mountRef.current) return;
       camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
@@ -315,44 +326,70 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       try {
-        if (!auth) throw new Error("Chưa khởi tạo Auth");
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
           await signInAnonymously(auth);
         }
       } catch (err) {
-        console.warn("Chế độ Offline/Local: Hoạt động không cần Đăng nhập Firebase.");
+        console.error("Auth error:", err);
       } finally {
         setTimeout(() => setIsInitializing(false), 2000);
       }
     };
     init();
-    if (auth) {
-      return onAuthStateChanged(auth, setUser);
-    } else {
-      setIsInitializing(false);
-    }
+    return onAuthStateChanged(auth, setUser);
   }, []);
 
   useEffect(() => {
-    if (!user || !db) return;
+    if (!user) return;
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'zones');
     return onSnapshot(q, (snap) => {
       if (!snap.empty) {
         setZones(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }
-    }, (err) => {
-      console.warn("Firestore ngoại tuyến, đang hiển thị chế độ dữ liệu tĩnh mẫu.");
     });
   }, [user]);
 
+  const groupedZones = React.useMemo(() => {
+    const groups = {};
+    zones.forEach(z => {
+      const key = z.country_vn || z.country;
+      if (!groups[key]) {
+        groups[key] = {
+          id: `group-${key.toLowerCase().replace(/\s+/g, '-')}`,
+          country_vn: z.country_vn,
+          country: z.country,
+          lat: parseFloat(z.lat),
+          lng: parseFloat(z.lng),
+          severity: z.severity,
+          events: []
+        };
+      }
+      
+      // Push specific event to this country's event timeline
+      groups[key].events.push(z);
+      
+      // Elevate the entire country's warning level if any sub-event is 'high'
+      if (z.severity === 'high') {
+        groups[key].severity = 'high';
+      }
+    });
+    return Object.values(groups);
+  }, [zones]);
+
+  // Adjust selected group reference if coordinates/list updates
+  const activeSelectedGroup = React.useMemo(() => {
+    if (!selectedZone) return null;
+    return groupedZones.find(g => g.id === selectedZone.id || g.country_vn === selectedZone.country_vn) || null;
+  }, [selectedZone, groupedZones]);
+
   const runScanner = async () => {
-    if (loading) return;
+    if (loading || !user) return;
     setLoading(true);
     addNotification("Tiến hành quét dữ liệu AI...");
     try {
-      const prompt = `Phân tích 5 điểm nóng xung đột quốc tế hiện nay. Tên quốc gia tiếng Anh. JSON: { "zones": [{ "id": "slug", "country_vn": "Tên Việt", "country": "English Name", "lat": number, "lng": number, "severity": "high"|"medium", "detail": "Mô tả", "advisory": "Lời khuyên" }] }`;
+      const prompt = `Phân tích 5 điểm nóng xung đột quốc tế hiện nay. Tên quốc gia tiếng Anh. Nếu có nhiều sự kiện tại một vùng, hãy cung cấp các sự kiện riêng lẻ nhưng chung country. JSON format: { "zones": [{ "id": "slug", "country_vn": "Tên Việt", "country": "English Name", "lat": number, "lng": number, "severity": "high"|"medium", "detail": "Mô tả cụ thể tin tức", "advisory": "Lời khuyên an ninh" }] }`;
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -365,18 +402,13 @@ export default function App() {
       const data = await response.json();
       const result = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text);
       if (result?.zones) {
-        if (db && user) {
-          for (const zone of result.zones) {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'zones', zone.id), { ...zone, timestamp: serverTimestamp() });
-          }
-        } else {
-          // Fallback cập nhật state trực tiếp khi ngoại tuyến
-          setZones(result.zones);
+        for (const zone of result.zones) {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'zones', zone.id), { ...zone, timestamp: serverTimestamp() });
         }
-        addNotification("Cập nhật hệ thống thành công");
+        addNotification("Cập nhật mạng lưới thành công");
       }
     } catch (e) {
-      addNotification("Lỗi kết nối vệ tinh");
+      addNotification("Lỗi kết nối vệ tinh AI");
     } finally {
       setLoading(false);
     }
@@ -410,6 +442,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen bg-[#020408] text-slate-300 overflow-hidden font-sans selection:bg-blue-500/30">
+      {/* Notifications */}
       <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none">
         {notifications.map(n => (
           <div key={n.id} className="bg-blue-600/90 backdrop-blur-md text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 border border-white/20">
@@ -418,6 +451,7 @@ export default function App() {
         ))}
       </div>
 
+      {/* Header */}
       <header className="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-black/40 backdrop-blur-2xl z-50">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-4">
@@ -437,7 +471,7 @@ export default function App() {
           <div className="hidden lg:flex items-center gap-6">
              <div className="text-center">
                 <p className="text-[8px] font-black text-slate-600 uppercase mb-1 tracking-tighter">Bản tin hiện tại</p>
-                <p className="text-[10px] font-bold text-blue-400 uppercase">{zones.length} Hotspots Detected</p>
+                <p className="text-[10px] font-bold text-blue-400 uppercase">{groupedZones.length} Điểm Nóng Hợp Nhất</p>
              </div>
           </div>
         </div>
@@ -454,10 +488,13 @@ export default function App() {
         </button>
       </header>
 
+      {}
       <main className="flex-1 flex overflow-hidden">
+        {/* Globe Visualization */}
         <div className="flex-1 relative bg-[radial-gradient(circle_at_center,_#0a1a2f_0%,_#020408_100%)]">
-          <ThreeGlobe zones={zones} onSelect={setSelectedZone} selectedZone={selectedZone} />
+          <ThreeGlobe zones={groupedZones} onSelect={setSelectedZone} selectedZone={activeSelectedGroup} />
           
+          {/* Legend Area */}
           <div className="absolute bottom-12 left-12 space-y-6 pointer-events-none">
             <div className="p-6 border border-white/10 bg-black/60 backdrop-blur-2xl rounded-3xl shadow-2xl space-y-4 w-64 animate-in fade-in slide-in-from-left-4">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2 mb-2">
@@ -489,24 +526,32 @@ export default function App() {
             </div>
           </div>
 
+          {/* Quick List Overlay */}
           <div className="absolute top-12 right-12 flex flex-col gap-3 max-h-[60%] overflow-y-auto no-scrollbar pb-10">
-             {zones.map(z => (
+             {groupedZones.map(z => (
                <button 
                 key={z.id}
                 onClick={() => setSelectedZone(z)}
-                className={`flex items-center gap-4 px-6 py-3 border rounded-2xl transition-all backdrop-blur-md group ${selectedZone?.id === z.id ? 'bg-blue-600 border-blue-400 translate-x-[-12px] shadow-xl shadow-blue-600/30' : 'bg-black/30 border-white/5 hover:border-white/20 hover:bg-white/5'}`}
+                className={`flex items-center gap-4 px-6 py-3 border rounded-2xl transition-all backdrop-blur-md group ${activeSelectedGroup?.id === z.id ? 'bg-blue-600 border-blue-400 translate-x-[-12px] shadow-xl shadow-blue-600/30' : 'bg-black/30 border-white/5 hover:border-white/20 hover:bg-white/5'}`}
                >
                  <div className={`w-2 h-2 rounded-full ${z.severity === 'high' ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`} />
-                 <span className={`text-[11px] font-black uppercase tracking-[0.2em] ${selectedZone?.id === z.id ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>
-                    {z.country_vn}
-                 </span>
-                 <ChevronRight size={14} className={`transition-transform ${selectedZone?.id === z.id ? 'translate-x-1 opacity-100' : 'opacity-0 group-hover:opacity-40'}`} />
+                 <div className="flex flex-col items-start gap-0.5">
+                   <span className={`text-[11px] font-black uppercase tracking-[0.2em] ${activeSelectedGroup?.id === z.id ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>
+                      {z.country_vn}
+                   </span>
+                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">
+                      {z.events.length} Diễn biến
+                   </span>
+                 </div>
+                 <ChevronRight size={14} className={`ml-2 transition-transform ${activeSelectedGroup?.id === z.id ? 'translate-x-1 opacity-100' : 'opacity-0 group-hover:opacity-40'}`} />
                </button>
              ))}
           </div>
         </div>
 
-        <aside className={`w-[500px] bg-black/60 border-l border-white/10 backdrop-blur-3xl flex flex-col transition-all duration-700 ease-out z-[60] ${selectedZone ? 'translate-x-0' : 'translate-x-[40px] opacity-0 pointer-events-none'}`}>
+        {/* Intelligence Side Panel */}
+        {}
+        <aside className={`w-[500px] bg-black/60 border-l border-white/10 backdrop-blur-3xl flex flex-col transition-all duration-700 ease-out z-[60] ${activeSelectedGroup ? 'translate-x-0' : 'translate-x-[40px] opacity-0 pointer-events-none'}`}>
           <div className="p-10 border-b border-white/5 flex items-center justify-between bg-white/[0.01]">
             <div className="flex items-center gap-4">
               <div className="p-2.5 bg-blue-600/20 rounded-xl">
@@ -514,7 +559,7 @@ export default function App() {
               </div>
               <div>
                  <h2 className="text-xs font-black italic tracking-[0.4em] text-white uppercase leading-none">Báo cáo thực địa</h2>
-                 <p className="text-[9px] font-bold text-slate-500 mt-2 uppercase">Analysis Hash: {selectedZone?.id.slice(0,8)}</p>
+                 <p className="text-[9px] font-bold text-slate-500 mt-2 uppercase">Gộp nhóm: {activeSelectedGroup?.events.length} tin tức liên quan</p>
               </div>
             </div>
             <button 
@@ -526,50 +571,66 @@ export default function App() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-            {selectedZone && (
-              <div key={selectedZone.id} className="animate-in fade-in slide-in-from-right-8 duration-500 space-y-10">
+            {activeSelectedGroup && (
+              <div key={activeSelectedGroup.id} className="animate-in fade-in slide-in-from-right-8 duration-500 space-y-10">
                 <div className="space-y-6">
                    <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-red-600/10 border border-red-500/20 text-red-500 rounded-full">
                      <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
-                     <span className="text-[10px] font-black uppercase tracking-[0.2em]">Tình trạng: Khẩn cấp</span>
+                     <span className="text-[10px] font-black uppercase tracking-[0.2em]">Cấp độ: {activeSelectedGroup.severity === 'high' ? 'Khẩn cấp tối đa' : 'Cảnh giác cao'}</span>
                    </div>
-                   <h1 className="text-6xl font-black text-white italic tracking-tighter uppercase leading-[0.9] break-words">
-                    {selectedZone.country_vn}
+                   <h1 className="text-5xl font-black text-white italic tracking-tighter uppercase leading-[0.9] break-words">
+                    {activeSelectedGroup.country_vn}
                    </h1>
                    <div className="flex items-center gap-4 text-slate-500">
                       <Globe size={14} />
-                      <p className="text-xs font-black uppercase tracking-[0.4em] border-l border-white/10 pl-4">{selectedZone.country} Region</p>
+                      <p className="text-xs font-black uppercase tracking-[0.4em] border-l border-white/10 pl-4">{activeSelectedGroup.country} Region</p>
                    </div>
                 </div>
 
-                <div className="space-y-6">
-                  <div className="p-8 bg-white/[0.02] rounded-[40px] border border-white/5 space-y-5 relative overflow-hidden group hover:bg-white/[0.04] transition-colors">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
-                      <Info size={120} />
-                    </div>
-                    <h4 className="text-[11px] font-black text-blue-400 uppercase tracking-[0.3em] flex items-center gap-3">
-                      <div className="w-6 h-px bg-blue-400/30" /> Diễn biến tình hình
-                    </h4>
-                    <p className="text-[15px] text-slate-200 leading-relaxed italic font-medium tracking-tight">
-                       "{selectedZone.detail}"
-                    </p>
+                {/* Event feeds chronological layout */}
+                <div className="space-y-8">
+                  <div className="border-l border-blue-500/30 ml-4 pl-8 space-y-10 relative">
+                    {activeSelectedGroup.events.map((event, index) => (
+                      <div key={event.id} className="relative group space-y-4">
+                        {/* Timeline node */}
+                        <div className={`absolute -left-[41px] top-1 w-6 h-6 rounded-full border-4 border-black flex items-center justify-center ${event.severity === 'high' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]'}`}>
+                          <Clock size={10} className="text-black font-bold" />
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">DIỄN BIẾN #{index + 1}</span>
+                            <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${event.severity === 'high' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-orange-500/10 text-orange-500 border border-orange-500/20'}`}>
+                              {event.severity === 'high' ? 'Nghiêm trọng' : 'Chú ý'}
+                            </span>
+                          </div>
+                          
+                          <div className="p-6 bg-white/[0.02] rounded-[24px] border border-white/5 space-y-4 hover:bg-white/[0.04] transition-colors">
+                            <p className="text-[14px] text-slate-200 leading-relaxed italic font-medium tracking-tight">
+                              "{event.detail}"
+                            </p>
+                            
+                            <div className="pt-3 border-t border-white/5 space-y-2">
+                              <p className="text-[9px] font-black text-orange-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <MessageSquareWarning size={12} /> Chỉ thị an toàn riêng biệt:
+                              </p>
+                              <p className="text-[12px] font-medium text-slate-300 leading-relaxed pl-4 border-l border-orange-500/40">
+                                {event.advisory}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="p-8 bg-orange-600/5 border border-orange-500/20 rounded-[40px] space-y-4">
-                    <h4 className="text-[11px] font-black text-orange-500 uppercase tracking-[0.3em] flex items-center gap-3">
-                      <div className="w-6 h-px bg-orange-500/30" /> Chỉ thị an toàn
-                    </h4>
-                    <p className="text-[13px] font-bold text-white italic leading-relaxed bg-white/5 p-4 rounded-2xl border border-white/5">
-                       {selectedZone.advisory}
-                    </p>
-                  </div>
-
+                  {/* Consular Hotline section */}
                   <div className="p-10 bg-gradient-to-br from-red-600/20 via-transparent to-transparent border border-red-500/20 rounded-[40px] shadow-3xl">
                     <h4 className="text-[11px] font-black text-red-500 uppercase mb-8 tracking-[0.3em] flex items-center gap-3 border-b border-red-500/10 pb-4">
                       <ShieldCheck size={18} /> Hotline Bảo hộ công dân
                     </h4>
                     
-                    {VIETNAM_EMBASSY_CONTACTS[selectedZone.country] ? (
+                    {VIETNAM_EMBASSY_CONTACTS[activeSelectedGroup.country] ? (
                       <div className="space-y-8">
                         <div className="group cursor-pointer">
                           <p className="text-[10px] text-red-500 font-black uppercase mb-3 tracking-widest opacity-60">Emergency Line 24/7</p>
@@ -577,7 +638,7 @@ export default function App() {
                              <div className="p-4 bg-red-600 rounded-2xl shadow-lg shadow-red-600/40">
                                 <Phone size={24} className="text-white" />
                              </div>
-                             <p className="text-3xl font-black text-white tracking-tighter">{VIETNAM_EMBASSY_CONTACTS[selectedZone.country].phone}</p>
+                             <p className="text-3xl font-black text-white tracking-tighter">{VIETNAM_EMBASSY_CONTACTS[activeSelectedGroup.country].phone}</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-6 p-4">
@@ -586,7 +647,7 @@ export default function App() {
                           </div>
                           <div>
                             <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Embassy Location</p>
-                            <p className="text-[13px] font-bold text-slate-300 leading-relaxed italic pr-4">{VIETNAM_EMBASSY_CONTACTS[selectedZone.country].address}</p>
+                            <p className="text-[13px] font-bold text-slate-300 leading-relaxed italic pr-4">{VIETNAM_EMBASSY_CONTACTS[activeSelectedGroup.country].address}</p>
                           </div>
                         </div>
                       </div>
