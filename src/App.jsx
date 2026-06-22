@@ -114,7 +114,7 @@ const DEFAULT_ZONES = [
     severity: 'high',
     type: 'conflict',
     detail: 'Căng thẳng quân sự và các biện pháp phản áp leo thang mạnh mẽ tại khu vực biên giới Nam - Bắc.',
-    advisory: 'Công dân cần đăng ứng cứu khẩn cấp và theo dõi sát thông báo sơ tán từ Đại sứ quán.'
+    advisory: 'Công dân cần đăng ký cứu khẩn cấp và theo dõi sát thông báo sơ tán từ Đại sứ quán.'
   },
   {
     id: 'vietnam-disaster',
@@ -411,25 +411,69 @@ export default function App() {
     return type;
   };
 
+  // Thiết lập cơ chế chống lỗi CORS và lỗi kết nối mạng an toàn (Fallback proxy)
+  const fetchRSSWithFallback = async (rssUrl) => {
+    const apiEndpoints = [
+      `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
+      `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`,
+      `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`
+    ];
+
+    let lastError = null;
+
+    for (let i = 0; i < apiEndpoints.length; i++) {
+      const endpoint = apiEndpoints[i];
+      try {
+        if (i === 0) {
+          const response = await fetch(endpoint);
+          const data = await response.json();
+          if (data.status === 'ok' && data.items) {
+            return data.items;
+          }
+        } else if (i === 1) {
+          const response = await fetch(endpoint);
+          const resJson = await response.json();
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(resJson.contents, "text/xml");
+          const items = Array.from(xmlDoc.querySelectorAll("item")).map(el => ({
+            title: el.querySelector("title")?.textContent || "",
+            description: el.querySelector("description")?.textContent || "",
+            link: el.querySelector("link")?.textContent || ""
+          }));
+          if (items.length > 0) return items;
+        } else {
+          const response = await fetch(endpoint);
+          const xmlText = await response.text();
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+          const items = Array.from(xmlDoc.querySelectorAll("item")).map(el => ({
+            title: el.querySelector("title")?.textContent || "",
+            description: el.querySelector("description")?.textContent || "",
+            link: el.querySelector("link")?.textContent || ""
+          }));
+          if (items.length > 0) return items;
+        }
+      } catch (err) {
+        console.warn(`Giao thức liên kết ${i + 1} gián đoạn:`, err.message);
+        lastError = err;
+      }
+    }
+    throw lastError || new Error("Mất kết nối hoàn toàn tới luồng dữ liệu vệ tinh.");
+  };
+
   const runScanner = async () => {
     if (loading) return;
     setLoading(true);
     addNotification("Kết nối máy chủ RSS và phân tích dữ liệu...");
     
     try {
-      // Sử dụng nguồn RSS tin tức quốc tế hàng đầu từ NYT World
       const targetRss = 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml';
-      const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(targetRss)}`);
-      const data = await response.json();
-      
-      if (data.status !== 'ok' || !data.items) {
-        throw new Error("Không thể liên kết nguồn luồng tin RSS.");
-      }
+      const items = await fetchRSSWithFallback(targetRss);
 
       const activeHotspots = [];
       const countries = Object.keys(LOCATION_DATABASE);
 
-      data.items.forEach((item, idx) => {
+      items.forEach((item) => {
         const fullText = `${item.title} ${item.description || ''}`.toLowerCase();
         
         // Quét tìm quốc gia khớp cơ sở dữ liệu
@@ -480,7 +524,7 @@ export default function App() {
       addNotification(`Quét thành công! Cập nhật ${finalZones.length} điểm biến động.`);
     } catch (e) {
       console.error(e);
-      addNotification("Lỗi đồng bộ RSS. Sử dụng cơ sở dữ liệu dự phòng.");
+      addNotification("Cảnh báo: Kết nối vệ tinh gián đoạn. Sử dụng cơ sở dữ liệu ngoại tuyến.");
       setZones(DEFAULT_ZONES);
     } finally {
       setLoading(false);
