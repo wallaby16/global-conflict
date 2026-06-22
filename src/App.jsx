@@ -351,8 +351,9 @@ export default function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [notifications, setNotifications] = useState([]);
 
+  // Tạo định danh ngẫu nhiên cực kỳ an toàn để giải quyết triệt để lỗi trùng khóa key trong React
   const addNotification = (msg) => {
-    const id = Date.now();
+    const id = Math.random().toString(36).substring(2, 11) + Date.now().toString();
     setNotifications(prev => [...prev, { id, msg }]);
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 4000);
   };
@@ -559,9 +560,14 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen bg-[#020408] text-slate-300 overflow-hidden font-sans selection:bg-blue-500/30">
-      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none">
+      
+      {/* Tối ưu hóa flex container chứa các thông báo, căn giữa hoàn hảo và xử lý pointer-events */}
+      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
         {notifications.map(n => (
-          <div key={n.id} className="bg-blue-600/90 backdrop-blur-md text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 border border-white/20">
+          <div 
+            key={n.id} 
+            className="bg-blue-600/90 backdrop-blur-md text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-3 border border-white/20 notification-animation pointer-events-auto"
+          >
             <Zap size={14} fill="currentColor" /> {n.msg}
           </div>
         ))}
@@ -801,6 +807,21 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 20px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.3); }
+
+        /* Tối ưu hiệu ứng hoạt ảnh trượt xuống mượt mà và chống đè chồng */
+        @keyframes slideDown {
+          from {
+            transform: translateY(-12px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .notification-animation {
+          animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
       `}</style>
     </div>
   );
